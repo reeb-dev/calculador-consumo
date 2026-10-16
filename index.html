@@ -19,7 +19,7 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 60px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   h2 { font-size: 16px; margin: 0 0 12px; }
   .sub { color: var(--muted); margin: 0 0 20px; }
@@ -45,7 +45,19 @@
   input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   input.money { text-align: right; font-variant-numeric: tabular-nums; }
   .tablewrap { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; min-width: 760px; }
+  #rows, #rows input, #rows select, #rows button { font-size: 17px; }
+  #rows td { padding: 12px 10px; }
+  #rows input[type=text], #rows select { padding: 11px 12px; }
+  #rows input[type=checkbox] { width: 22px; height: 22px; }
+  #rows input.money { min-width: 170px; font-weight: 600; }
+  #rows td input.short { min-width: 110px; max-width: 140px; }
+  #rows td input.year { width: 90px; }
+  #rows .per { gap: 8px; }
+  #rows select { min-width: 140px; }
+  tr.year td { font-size: 19px; padding: 14px 10px !important; }
+  tr.year small { font-size: 14px; }
+  thead th { font-size: 13px; padding: 10px; }
+  table { border-collapse: collapse; width: 100%; min-width: 1100px; }
   th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
   th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
