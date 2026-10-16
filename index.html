@@ -31,6 +31,8 @@
   .grid.rules input { height: 38px; }
   select { padding: 8px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--input-bg); color: var(--ink); font: inherit; }
   td input.year { width: 70px; min-width: 0; }
+  tr.year td { background: var(--bg); font-weight: 600; cursor: pointer; user-select: none; }
+  tr.year small { color: var(--muted); font-weight: 400; margin-left: 8px; }
   .per { display: flex; gap: 6px; }
   .newmonth { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
   .newmonth > strong { flex-basis: 100%; }
@@ -221,14 +223,34 @@ function periodoCell(r) {
     ...MESES.map((n, i) => el("option", { value: i + 1, textContent: n, selected: i + 1 === mes })));
   const yr = el("input", { type: "text", className: "year", value: anio || "2026", inputMode: "numeric", maxLength: 4 });
   const upd = () => { r.periodo = +sel.value ? `${String(sel.value).padStart(2, "0")}/${yr.value}` : ""; refresh(); };
+  const rebuild = () => { sortRows(); buildRows(); refresh(); };
   sel.addEventListener("change", upd); yr.addEventListener("input", upd);
+  sel.addEventListener("change", rebuild); yr.addEventListener("change", rebuild);
   return el("div", { className: "per" }, sel, yr);
 }
 
+// Más reciente primero; las filas sin período van al final.
+function sortRows() {
+  const key = r => { const { mes, anio } = splitPer(r.periodo); return mes ? +anio * 12 + mes : 0; };
+  S.rows = S.rows.map((r, i) => [r, i]).sort((a, b) => key(b[0]) - key(a[0]) || b[0].liq.localeCompare(a[0].liq) || a[1] - b[1]).map(x => x[0]);
+}
+const yearOf = r => splitPer(r.periodo).anio || "Sin período";
+
 function buildRows() {
   const tb = $("rows"); tb.replaceChildren();
+  S.collapsed = S.collapsed || {};
+  let last = null;
   S.rows.forEach((r, idx) => {
-    const tr = el("tr");
+    const y = yearOf(r);
+    if (y !== last) {
+      last = y;
+      const h = el("td", { colSpan: 9, id: `yh${y}` });
+      const hr = el("tr", { className: "year" }, h);
+      hr.addEventListener("click", () => { S.collapsed[y] = !S.collapsed[y]; refresh(); });
+      tb.append(hr);
+    }
+    const tr = el("tr", { id: `r${idx}` });
+    tr.dataset.year = y;
     const on = el("input", { type: "checkbox", checked: r.on });
     on.addEventListener("change", () => { r.on = on.checked; refresh(); });
     const imp = textInput(editMoney(r.importe), v => { r.importe = parseMoney(v); refresh(); }, "money");
@@ -307,7 +329,8 @@ function refresh() {
   $("pctName").textContent = `(${n})`;
   $("thOther").textContent = `Parte ${n}`;
   S.rows.forEach((r, idx) => {
-    const tr = $("rows").children[idx];
+    const tr = $(`r${idx}`);
+    tr.hidden = !!S.collapsed[tr.dataset.year];
     const falta = r.importe == null;
     tr.className = !r.on ? "off" : falta ? "missing" : "";
     const c = falta ? null : calc(r.importe);
@@ -316,6 +339,11 @@ function refresh() {
     $(`p${idx}`).textContent = c ? money(c.parte) : "";
     if (falta && r.on) $(`b${idx}`).replaceChildren(el("span", { className: "tag", textContent: "falta importe" }));
   });
+  for (const h of $("rows").querySelectorAll("tr.year td")) {
+    const y = h.id.slice(2), rs = S.rows.filter(r => yearOf(r) === y && r.on && r.importe != null);
+    const ex = rs.reduce((a, r) => a + calc(r.importe).exceso, 0), pa = rs.reduce((a, r) => a + calc(r.importe).parte, 0);
+    h.replaceChildren(`${S.collapsed[y] ? "▸" : "▾"} ${y}`, el("small", { textContent: `${rs.length} liquidaciones · excedente ${money(ex)} · parte ${S.otherName || ""} ${money(pa)}` }));
+  }
   const t = totals();
   $("totals").replaceChildren(
     stat(`Facturado (${t.n} liquidaciones)`, money(t.facturado)),
@@ -356,6 +384,9 @@ function addMonth() {
   } else {
     const mk = liq => ({ on: true, periodo: per, liq, importe, estado: "" });
     S.rows.unshift(...(dos ? [mk("2 de 2"), mk("1 de 2")] : [mk("1 de 2")]));
+    sortRows();
+    S.collapsed = S.collapsed || {};
+    S.collapsed[$("nmAnio").value] = false;
   }
   buildRows(); prefillNewMonth(); refresh();
 }
@@ -391,7 +422,7 @@ function init() {
     try { await navigator.clipboard.writeText($("msg").textContent); $("copied").textContent = "Copiado."; }
     catch { $("copied").textContent = "No pude copiar; seleccioná el texto a mano."; }
   });
-  buildRows(); buildPagos(); refresh();
+  sortRows(); buildRows(); buildPagos(); refresh();
 }
 init();
 </script>
