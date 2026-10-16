@@ -63,6 +63,15 @@
   .stat.big { border-color: var(--accent); }
   .stat.big b { color: var(--accent); font-size: 24px; }
   .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  #report { display: none; }
+  @media print {
+    body { background: #fff; color: #000; }
+    main > :not(#report) { display: none !important; }
+    #report { display: block; }
+    #report table { min-width: 0; font-size: 12px; }
+    #report th, #report td { border-bottom: 1px solid #ccc; padding: 5px 4px; color: #000; }
+    #report h1 { font-size: 20px; }
+  }
   pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0; font: 13px/1.5 ui-monospace, Menlo, monospace; }
 </style>
 </head>
@@ -126,9 +135,11 @@
     <div class="row">
       <input id="phone" type="text" inputmode="tel" placeholder="WhatsApp de Sofi (ej. 54911…)" style="max-width:260px">
       <button class="primary" id="wa">Enviar por WhatsApp</button>
+      <button id="pdf">Descargar PDF</button>
       <button id="copy">Copiar mensaje</button><span class="hint" id="copied"></span></div>
     <p class="hint">Se abre WhatsApp con el mensaje ya escrito; lo mandás vos con un toque. Con el número cargado va directo al chat de Sofi; sin número, elegís el contacto.</p>
   </section>
+  <section id="report"></section>
 </main>
 
 <script>
@@ -270,6 +281,27 @@ function message(t) {
   return lines.join("\n");
 }
 
+function buildReport(t) {
+  const n = S.otherName || "Sofi";
+  const tr = (cells, tag = "td") => el("tr", {}, ...cells.map((c, i) => el(tag, { textContent: c, className: i > 1 ? "num" : "" })));
+  const body = S.rows.filter(r => r.on && r.importe != null).map(r => {
+    const c = calc(r.importe);
+    return tr([perName(r.periodo), r.liq, money(r.importe), money(c.base), money(c.exceso), money(c.parte)]);
+  });
+  const foot = tr(["Total", "", money(t.facturado), money(t.base), money(t.exceso), money(t.parte)], "th");
+  const lines = [
+    `Consumo normal de la casa vacía: ${money(S.baseline)} por liquidación (a cargo del dueño). El excedente se reparte: ${n} paga ${S.pct}%.`,
+    ...(t.pagado ? [`Pagos recibidos: ${money(t.pagado)}`] : []),
+    `Saldo a pagar por ${n}: ${money(t.saldo)}` + (S.cuotas > 1 && t.saldo > 0 ? ` (${S.cuotas} cuotas de ${money(t.cuota)})` : ""),
+  ];
+  $("report").replaceChildren(
+    el("h1", { textContent: "Reparto de consumo" }),
+    el("p", { textContent: `Emitido el ${new Date().toLocaleDateString("es-AR")}` }),
+    el("table", {}, el("thead", {}, tr(["Período", "Liquidación", "Importe", "Consumo normal", "Excedente", `Parte ${n}`], "th")), el("tbody", {}, ...body, foot)),
+    ...lines.map(l => el("p", { textContent: l })),
+  );
+}
+
 function refresh() {
   const n = S.otherName || "la otra persona";
   $("pctName").textContent = `(${n})`;
@@ -296,6 +328,7 @@ function refresh() {
   );
   if (t.faltan) $("totals").append(el("div", { className: "hint", textContent: `Faltan importes en ${t.faltan} liquidación(es): el total todavía no es definitivo.` }));
   $("msg").textContent = message(t);
+  buildReport(t);
   save();
 }
 
@@ -353,6 +386,7 @@ function init() {
     const num = (S.phone || "").replace(/\D/g, "");
     window.open(`https://wa.me/${num}?text=${encodeURIComponent($("msg").textContent)}`, "_blank", "noopener");
   });
+  $("pdf").addEventListener("click", () => window.print());
   $("copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("msg").textContent); $("copied").textContent = "Copiado."; }
     catch { $("copied").textContent = "No pude copiar; seleccioná el texto a mano."; }
