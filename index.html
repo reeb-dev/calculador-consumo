@@ -123,7 +123,11 @@
   <section class="card">
     <h2>Para mandar por WhatsApp</h2>
     <pre id="msg"></pre>
-    <div class="row"><button class="primary" id="copy">Copiar mensaje</button><span class="hint" id="copied"></span></div>
+    <div class="row">
+      <input id="phone" type="text" inputmode="tel" placeholder="WhatsApp de Sofi (ej. 54911…)" style="max-width:260px">
+      <button class="primary" id="wa">Enviar por WhatsApp</button>
+      <button id="copy">Copiar mensaje</button><span class="hint" id="copied"></span></div>
+    <p class="hint">Se abre WhatsApp con el mensaje ya escrito; lo mandás vos con un toque. Con el número cargado va directo al chat de Sofi; sin número, elegís el contacto.</p>
   </section>
 </main>
 
@@ -342,6 +346,12 @@ function init() {
   $("resetRows").addEventListener("click", () => {
     if (!confirm("Esto reemplaza las liquidaciones por las de la captura. ¿Seguro?")) return;
     S.rows = defaults().rows; buildRows(); refresh();
+  });
+  $("phone").value = S.phone || "";
+  $("phone").addEventListener("input", e => { S.phone = e.target.value; save(); });
+  $("wa").addEventListener("click", () => {
+    const num = (S.phone || "").replace(/\D/g, "");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent($("msg").textContent)}`, "_blank", "noopener");
   });
   $("copy").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText($("msg").textContent); $("copied").textContent = "Copiado."; }
