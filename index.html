@@ -32,6 +32,10 @@
   select { padding: 8px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--input-bg); color: var(--ink); font: inherit; }
   td input.year { width: 70px; min-width: 0; }
   .per { display: flex; gap: 6px; }
+  .newmonth { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 14px; }
+  .newmonth > strong { flex-basis: 100%; }
+  .newmonth > input.money { width: 200px; }
+  label.chk { display: flex; gap: 6px; align-items: center; margin: 0; color: var(--ink); }
   input[type=text], input[type=number] {
     width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
     background: var(--input-bg); color: var(--ink); font: inherit;
@@ -80,6 +84,13 @@
 
   <section class="card">
     <h2>Liquidaciones</h2>
+    <div class="newmonth">
+      <strong>Cargar mes nuevo</strong>
+      <div class="per"><select id="nmMes"></select><input id="nmAnio" type="text" class="year" inputmode="numeric" maxlength="4"></div>
+      <input id="nmImp" class="money" type="text" inputmode="decimal" placeholder="Importe de la factura">
+      <label class="chk"><input id="nmDos" type="checkbox" checked> Mismo importe en las 2 liquidaciones</label>
+      <button class="primary" id="nmAdd">Agregar mes</button>
+    </div>
     <div class="tablewrap">
       <table>
         <thead><tr>
@@ -284,7 +295,39 @@ function refresh() {
   save();
 }
 
+// Mes siguiente al más reciente cargado (o el mes actual si no hay nada).
+function nextPeriod() {
+  let max = 0;
+  for (const r of S.rows) { const { mes, anio } = splitPer(r.periodo); if (mes) max = Math.max(max, +anio * 12 + mes - 1); }
+  if (!max) { const d = new Date(); max = d.getFullYear() * 12 + d.getMonth() - 1; }
+  const n = max + 1;
+  return { mes: n % 12 + 1, anio: Math.floor(n / 12) };
+}
+function prefillNewMonth() {
+  const { mes, anio } = nextPeriod();
+  $("nmMes").value = mes; $("nmAnio").value = anio; $("nmImp").value = "";
+}
+function addMonth() {
+  const importe = parseMoney($("nmImp").value);
+  if (importe == null) { $("nmImp").focus(); return; }
+  const per = `${String($("nmMes").value).padStart(2, "0")}/${$("nmAnio").value}`;
+  const dos = $("nmDos").checked;
+  const mine = S.rows.filter(r => r.periodo === per);
+  if (mine.length) {
+    // El período ya existe: completa los importes vacíos en vez de duplicar filas.
+    mine.forEach(r => { if (r.importe == null) r.importe = importe; });
+  } else {
+    const mk = liq => ({ on: true, periodo: per, liq, importe, estado: "" });
+    S.rows.unshift(...(dos ? [mk("2 de 2"), mk("1 de 2")] : [mk("1 de 2")]));
+  }
+  buildRows(); prefillNewMonth(); refresh();
+}
+
 function init() {
+  $("nmMes").replaceChildren(...MESES.map((n, i) => el("option", { value: i + 1, textContent: n })));
+  $("nmAdd").addEventListener("click", addMonth);
+  $("nmImp").addEventListener("keydown", e => { if (e.key === "Enter") addMonth(); });
+  prefillNewMonth();
   $("baseline").value = editMoney(S.baseline);
   $("otherName").value = S.otherName;
   $("pct").value = S.pct;
