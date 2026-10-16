@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculador de consumo</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --ink: #1c2230; --muted: #667085; --line: #e3e6ec;
+    --accent: #2563eb; --accent-ink: #fff; --ok: #0f9d6b; --warn: #b45309; --warn-bg: #fff4e0;
+    --input-bg: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1b2029; --ink: #e8ebf2; --muted: #98a2b3; --line: #2b3240;
+      --accent: #5b8cff; --accent-ink: #0b1020; --ok: #34d399; --warn: #fbbf24; --warn-bg: #3a2c10;
+      --input-bg: #141821;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .grid.rules { align-items: end; }
+  .grid.rules label { min-height: 2.9em; display: flex; align-items: flex-end; flex-wrap: wrap; column-gap: .3em; }
+  .grid.rules input { height: 38px; }
+  select { padding: 8px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--input-bg); color: var(--ink); font: inherit; }
+  td input.year { width: 70px; min-width: 0; }
+  .per { display: flex; gap: 6px; }
+  input[type=text], input[type=number] {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--input-bg); color: var(--ink); font: inherit;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input.money { text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 760px; }
+  th, td { padding: 8px 6px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td input[type=text] { min-width: 110px; }
+  td input.short { min-width: 80px; max-width: 110px; }
+  tr.missing td { background: var(--warn-bg); }
+  tr.off td { opacity: .45; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 6px; background: var(--warn-bg); color: var(--warn); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 12px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.x { padding: 3px 9px; color: var(--muted); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .totals { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  .stat { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .stat small { display: block; color: var(--muted); font-size: 12px; }
+  .stat b { font-size: 19px; font-variant-numeric: tabular-nums; }
+  .stat.big { border-color: var(--accent); }
+  .stat.big b { color: var(--accent); font-size: 24px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  pre { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 0; font: 13px/1.5 ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Calculador de consumo</h1>
+  <p class="sub">Todo lo que supera el consumo normal de la casa vacía se reparte. Los importes se cargan de la factura.</p>
+
+  <section class="card">
+    <h2>Reglas del reparto</h2>
+    <div class="grid rules">
+      <div><label for="baseline">Consumo normal (casa vacía), por liquidación</label><input id="baseline" class="money" type="text" inputmode="decimal"></div>
+      <div><label for="otherName">Nombre de la otra persona</label><input id="otherName" type="text"></div>
+      <div><label for="pct">% del excedente que paga <span id="pctName"></span></label><input id="pct" class="money" type="number" min="0" max="100" step="1"></div>
+      <div><label for="cuotas">Cuotas para devolver el saldo</label><input id="cuotas" class="money" type="number" min="1" max="36" step="1"></div>
+    </div>
+    <p class="hint">El consumo normal lo paga siempre quien es dueño de la casa. Solo el excedente (importe − consumo normal) se reparte. Si una liquidación es menor al consumo normal, el excedente es 0, nunca negativo.</p>
+  </section>
+
+  <section class="card">
+    <h2>Liquidaciones</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Contar</th><th>Período</th><th>Liquidación</th><th class="num">Importe</th><th>Estado</th>
+          <th class="num">Consumo normal</th><th class="num">Excedente</th><th class="num" id="thOther">Parte</th><th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="row"><button id="addRow">+ Agregar liquidación</button><button id="resetRows">Volver a los datos de la captura</button></div>
+    <p class="hint">Las filas en naranja no tienen importe: no suman hasta que las cargues. Destildá "Contar" si una liquidación está duplicada o no corresponde.</p>
+  </section>
+
+  <section class="card">
+    <h2>Pagos ya recibidos</h2>
+    <div class="tablewrap">
+      <table style="min-width:420px">
+        <thead><tr><th>Fecha / detalle</th><th class="num">Monto</th><th></th></tr></thead>
+        <tbody id="pagos"></tbody>
+      </table>
+    </div>
+    <div class="row"><button id="addPago">+ Agregar pago</button></div>
+  </section>
+
+  <section class="card">
+    <h2>Resumen</h2>
+    <div class="totals" id="totals"></div>
+  </section>
+
+  <section class="card">
+    <h2>Para mandar por WhatsApp</h2>
+    <pre id="msg"></pre>
+    <div class="row"><button class="primary" id="copy">Copiar mensaje</button><span class="hint" id="copied"></span></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+// Todo el dinero se maneja en centavos enteros para no arrastrar errores de redondeo.
+const KEY = "calculador-consumo-v1";
+const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
+const money = c => fmt.format(c / 100);
+
+function parseMoney(s) {
+  s = String(s ?? "").replace(/[^\d.,-]/g, "");
+  if (!s || s === "-") return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (!/^\d+\.\d{1,2}$/.test(s)) s = s.replace(/\./g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+function splitPer(p) { const m = /^(\d{1,2})\s*\/\s*(\d{4})$/.exec(p || ""); return m ? { mes: +m[1], anio: m[2] } : { mes: 0, anio: "" }; }
+function perName(p) { const { mes, anio } = splitPer(p); return mes >= 1 && mes <= 12 ? `${MESES[mes - 1]} ${anio}` : (p || "s/d"); }
+const editMoney = c => c == null ? "" : (c / 100).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Datos de la captura (Período 02 a 05/2026). Los importes faltantes quedan vacíos para completar.
+function defaults() {
+  return {
+    baseline: 2200000, otherName: "Sofi", pct: 50, cuotas: 1,
+    rows: [
+      ["05/2026", "1 de 2", 15135682, "Pagada"],
+      ["05/2026", "2 de 2", null, ""],
+      ["04/2026", "2 de 2", 10726326, "Pagada"],
+      ["04/2026", "1 de 2", 10726326, "Pagada"],
+      ["03/2026", "2 de 2", 4658550, "Pagada"],
+      ["03/2026", "1 de 2", 4658550, "Pagada"],
+      ["02/2026", "2 de 2", 2272813, ""],
+      ["02/2026", "1 de 2", null, ""],
+    ].map(([periodo, liq, importe, estado]) => ({ on: true, periodo, liq, importe, estado })),
+    pagos: [],
+  };
+}
+
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)) || defaults(); } catch { S = defaults(); }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+
+// Reparte el excedente: cada liquidación se redondea al centavo (mitad hacia arriba).
+function calc(importe) {
+  const base = Math.min(importe, S.baseline);
+  const exceso = Math.max(0, importe - S.baseline);
+  const parte = Math.round(exceso * S.pct / 100);
+  return { base, exceso, parte };
+}
+
+function totals() {
+  const t = { facturado: 0, base: 0, exceso: 0, parte: 0, n: 0, faltan: 0 };
+  for (const r of S.rows) {
+    if (!r.on) continue;
+    if (r.importe == null) { t.faltan++; continue; }
+    const c = calc(r.importe);
+    t.n++; t.facturado += r.importe; t.base += c.base; t.exceso += c.exceso; t.parte += c.parte;
+  }
+  t.pagado = S.pagos.reduce((a, p) => a + (p.monto || 0), 0);
+  t.saldo = t.parte - t.pagado;
+  t.cuota = S.cuotas > 0 ? Math.ceil(Math.max(t.saldo, 0) / S.cuotas) : 0;
+  return t;
+}
+
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+
+function textInput(value, onInput, cls = "") {
+  const i = el("input", { type: "text", value: value ?? "", className: cls });
+  i.addEventListener("input", () => onInput(i.value));
+  return i;
+}
+
+function periodoCell(r) {
+  const { mes, anio } = splitPer(r.periodo);
+  const sel = el("select", {}, el("option", { value: 0, textContent: "Mes…" }),
+    ...MESES.map((n, i) => el("option", { value: i + 1, textContent: n, selected: i + 1 === mes })));
+  const yr = el("input", { type: "text", className: "year", value: anio || "2026", inputMode: "numeric", maxLength: 4 });
+  const upd = () => { r.periodo = +sel.value ? `${String(sel.value).padStart(2, "0")}/${yr.value}` : ""; refresh(); };
+  sel.addEventListener("change", upd); yr.addEventListener("input", upd);
+  return el("div", { className: "per" }, sel, yr);
+}
+
+function buildRows() {
+  const tb = $("rows"); tb.replaceChildren();
+  S.rows.forEach((r, idx) => {
+    const tr = el("tr");
+    const on = el("input", { type: "checkbox", checked: r.on });
+    on.addEventListener("change", () => { r.on = on.checked; refresh(); });
+    const imp = textInput(editMoney(r.importe), v => { r.importe = parseMoney(v); refresh(); }, "money");
+    imp.addEventListener("blur", () => { imp.value = editMoney(r.importe); });
+    const del = el("button", { className: "x", title: "Quitar", textContent: "✕" });
+    del.addEventListener("click", () => { S.rows.splice(idx, 1); buildRows(); refresh(); });
+    const cell = (cls, id) => el("td", { className: cls, id: `${id}${idx}` });
+    tr.append(
+      el("td", {}, on),
+      el("td", {}, periodoCell(r)),
+      el("td", {}, textInput(r.liq, v => { r.liq = v; refresh(); }, "short")),
+      el("td", {}, imp),
+      el("td", {}, textInput(r.estado, v => { r.estado = v; refresh(); }, "short")),
+      cell("num", "b"), cell("num", "e"), cell("num", "p"),
+      el("td", {}, del),
+    );
+    tb.append(tr);
+  });
+}
+
+function buildPagos() {
+  const tb = $("pagos"); tb.replaceChildren();
+  S.pagos.forEach((p, idx) => {
+    const m = textInput(editMoney(p.monto), v => { p.monto = parseMoney(v); refresh(); }, "money");
+    m.addEventListener("blur", () => { m.value = editMoney(p.monto); });
+    const del = el("button", { className: "x", title: "Quitar", textContent: "✕" });
+    del.addEventListener("click", () => { S.pagos.splice(idx, 1); buildPagos(); refresh(); });
+    tb.append(el("tr", {}, el("td", {}, textInput(p.detalle, v => { p.detalle = v; refresh(); })), el("td", {}, m), el("td", {}, del)));
+  });
+  if (!S.pagos.length) tb.append(el("tr", {}, el("td", { colSpan: 3, className: "hint", textContent: "Todavía no hay pagos cargados." })));
+}
+
+function stat(label, value, big) {
+  return el("div", { className: "stat" + (big ? " big" : "") }, el("small", { textContent: label }), el("b", { textContent: value }));
+}
+
+function message(t) {
+  const n = S.otherName || "Sofi";
+  const lines = [`Hola ${n}, te paso el cálculo del consumo:`, ""];
+  for (const r of S.rows) {
+    if (!r.on || r.importe == null) continue;
+    const c = calc(r.importe);
+    lines.push(`• ${perName(r.periodo)} (${r.liq}): ${money(r.importe)} → excedente ${money(c.exceso)} → tu parte ${money(c.parte)}`);
+  }
+  lines.push("", `Consumo normal de la casa vacía: ${money(S.baseline)} por liquidación (lo pongo yo).`,
+    `Excedente total: ${money(t.exceso)} · tu ${S.pct}% = ${money(t.parte)}`);
+  if (t.pagado) lines.push(`Ya pagaste: ${money(t.pagado)}`);
+  lines.push(`Saldo: ${money(t.saldo)}`);
+  if (S.cuotas > 1 && t.saldo > 0) lines.push(`En ${S.cuotas} cuotas de ${money(t.cuota)}`);
+  return lines.join("\n");
+}
+
+function refresh() {
+  const n = S.otherName || "la otra persona";
+  $("pctName").textContent = `(${n})`;
+  $("thOther").textContent = `Parte ${n}`;
+  S.rows.forEach((r, idx) => {
+    const tr = $("rows").children[idx];
+    const falta = r.importe == null;
+    tr.className = !r.on ? "off" : falta ? "missing" : "";
+    const c = falta ? null : calc(r.importe);
+    $(`b${idx}`).textContent = c ? money(c.base) : "";
+    $(`e${idx}`).textContent = c ? money(c.exceso) : "";
+    $(`p${idx}`).textContent = c ? money(c.parte) : "";
+    if (falta && r.on) $(`b${idx}`).replaceChildren(el("span", { className: "tag", textContent: "falta importe" }));
+  });
+  const t = totals();
+  $("totals").replaceChildren(
+    stat(`Facturado (${t.n} liquidaciones)`, money(t.facturado)),
+    stat("Consumo normal (a cargo del dueño)", money(t.base)),
+    stat("Excedente a repartir", money(t.exceso)),
+    stat(`Parte de ${S.otherName || "la otra persona"} (${S.pct}%)`, money(t.parte)),
+    stat("Ya pagado", money(t.pagado)),
+    stat("Saldo", money(t.saldo), true),
+    ...(S.cuotas > 1 && t.saldo > 0 ? [stat(`Cuota (${S.cuotas})`, money(t.cuota), true)] : []),
+  );
+  if (t.faltan) $("totals").append(el("div", { className: "hint", textContent: `Faltan importes en ${t.faltan} liquidación(es): el total todavía no es definitivo.` }));
+  $("msg").textContent = message(t);
+  save();
+}
+
+function init() {
+  $("baseline").value = editMoney(S.baseline);
+  $("otherName").value = S.otherName;
+  $("pct").value = S.pct;
+  $("cuotas").value = S.cuotas;
+  $("baseline").addEventListener("input", e => { S.baseline = Math.max(0, parseMoney(e.target.value) ?? 0); refresh(); });
+  $("baseline").addEventListener("blur", e => { e.target.value = editMoney(S.baseline); });
+  $("otherName").addEventListener("input", e => { S.otherName = e.target.value; refresh(); });
+  $("pct").addEventListener("input", e => { S.pct = Math.min(100, Math.max(0, Number(e.target.value) || 0)); refresh(); });
+  $("cuotas").addEventListener("input", e => { S.cuotas = Math.max(1, Math.floor(Number(e.target.value) || 1)); refresh(); });
+  $("addRow").addEventListener("click", () => { S.rows.push({ on: true, periodo: "", liq: "", importe: null, estado: "" }); buildRows(); refresh(); });
+  $("addPago").addEventListener("click", () => { S.pagos.push({ detalle: "", monto: null }); buildPagos(); refresh(); });
+  $("resetRows").addEventListener("click", () => {
+    if (!confirm("Esto reemplaza las liquidaciones por las de la captura. ¿Seguro?")) return;
+    S.rows = defaults().rows; buildRows(); refresh();
+  });
+  $("copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("msg").textContent); $("copied").textContent = "Copiado."; }
+    catch { $("copied").textContent = "No pude copiar; seleccioná el texto a mano."; }
+  });
+  buildRows(); buildPagos(); refresh();
+}
+init();
+</script>
+</body>
+</html>
